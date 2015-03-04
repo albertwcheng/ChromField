@@ -22,7 +22,8 @@
  
 #ifndef __CHROM_FIELD_H
 #define __CHROM_FIELD_H
- 
+
+#include <utility>
 #include <BitString.h>
 #include <stdint.h>
 #include <StringUtil.h>
@@ -94,9 +95,9 @@ public:
         //cerr<<"totalLength="<<totalLength<<endl;
 		return totalLength;		
 	}
-	ChromField(const string& chromSizeFile)
+	ChromField(const string& chromSizeFile,Byte valuePerByte)
 	{
-        this->init(readChromMap(chromSizeFile));
+        this->init(readChromMap(chromSizeFile),valuePerByte);
 		//this->BitString::print(cerr,true);
 	}
 	ChromField(const string& chromFieldFile, const string&chromSizeFile):BitString(chromFieldFile){
@@ -128,6 +129,10 @@ public:
                 StringUtil::split(line,"\t",splits);
                 string chrom=splits[0];
                 uint64_t start0=StringUtil::atoi(splits[1]);
+                if(splits[1][0]=='-'){
+                    start0=0;
+                    cerr<<"Warning: Start0<0, trimed at 0. line: "<<line<<endl;
+                }
                 uint64_t end1=StringUtil::atoi(splits[2]);
                 
                 map<string,chromcoord>::iterator chromcoordI=chromMap.find(chrom);
@@ -145,8 +150,10 @@ public:
                 }
                 
                 if(end1>chromcoordI->second.length()){
-                    cerr<<"Error: bed entry has end1 > length of chrom. line skipped: "<<line<<endl;
-                    continue;
+                    //cerr<<"Error: bed entry has end1 > length of chrom. line skipped: "<<line<<endl;
+                    cerr<<"Warning: bed entry has end1 > length of chrom. trimed to chrom length="<<chromcoordI->second.length()<<" line: "<<line<<endl;
+                    end1=chromcoordI->second.length();
+                    //continue;
                 }
                 
                 uint64_t chromBitStart0=chromcoordI->second.start0;
@@ -176,6 +183,38 @@ public:
             olen+=getBit(i);
         }
         return olen;
+    }
+    
+    pair<string,uint64_t> getBits(const string& chrom,uint64_t start0,uint64_t end1){
+        pair<string,uint64_t> bsOL;
+        bsOL.second=0;
+        uint64_t olen=0;
+        
+        map<string,chromcoord>::iterator chromcoordI=chromMap.find(chrom);
+        if(chromcoordI==chromMap.end()){
+            cerr<<"Error: Chrom "<<chrom<<" not defined in chromSizes file. getOverlapLength operation aborted"<<endl;
+            //return 0;
+            return bsOL;
+        }
+        
+        uint64_t chrom0=chromcoordI->second.start0;
+        for(uint64_t i=chrom0+start0;i<chrom0+end1;i++)
+        {
+            bool thisBit=getBit(i);
+            if(thisBit){
+                olen++;
+                bsOL.first+="1";
+            }else{
+                bsOL.first+="0";
+            }
+           
+            
+        }
+        
+        
+        bsOL.second=olen;
+        return bsOL;
+        
     }
     
     
